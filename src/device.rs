@@ -8,6 +8,7 @@ use crate::FilterError;
 /// Open Image Denoise supports a device concept, which allows different
 /// components of the application to use the API without interfering with each
 /// other.
+#[derive(Clone)]
 pub struct Device(pub(crate) OIDNDevice);
 
 impl Device {
@@ -25,6 +26,16 @@ impl Device {
         let handle = unsafe { oidnNewDevice(OIDNDeviceType_OIDN_DEVICE_TYPE_CPU) };
         unsafe {
             oidnCommitDevice(handle);
+        }
+        Self(handle)
+    }
+
+    /// Create a device to run denoising on the CPU
+    pub fn d3d12(uuid: *const ::std::os::raw::c_void) -> Self {
+        let handle = unsafe { oidnNewDevice(OIDNDeviceType_OIDN_DEVICE_TYPE_CUDA) };
+        unsafe {
+            oidnCommitDevice(handle);
+            oidnSyncDevice(handle);
         }
         Self(handle)
     }

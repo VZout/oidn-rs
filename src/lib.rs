@@ -44,7 +44,7 @@ pub use device::Device;
 pub use filter::RayTracing;
 
 // TODO: Rename later to just Error in a 2.0 release
-#[repr(u32)]
+#[repr(i32)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, TryFromPrimitive)]
 pub enum FilterError {
     None = sys::OIDNError_OIDN_ERROR_NONE,
