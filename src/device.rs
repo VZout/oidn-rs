@@ -31,7 +31,7 @@ impl Device {
     }
 
     /// Create a device to run denoising on the CPU
-    pub fn d3d12(uuid: *const ::std::os::raw::c_void) -> Self {
+    pub fn d3d12() -> Self {
         let handle = unsafe { oidnNewDevice(OIDNDeviceType_OIDN_DEVICE_TYPE_CUDA) };
         unsafe {
             oidnCommitDevice(handle);

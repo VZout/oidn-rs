@@ -3,75 +3,75 @@
 
 #pragma once
 
-#define OIDN_VERSION_MAJOR @OIDN_VERSION_MAJOR @
-#define OIDN_VERSION_MINOR @OIDN_VERSION_MINOR @
-#define OIDN_VERSION_PATCH @OIDN_VERSION_PATCH @
-#define OIDN_VERSION @OIDN_VERSION_NUMBER @
+#define OIDN_VERSION_MAJOR @OIDN_VERSION_MAJOR@
+#define OIDN_VERSION_MINOR @OIDN_VERSION_MINOR@
+#define OIDN_VERSION_PATCH @OIDN_VERSION_PATCH@
+#define OIDN_VERSION @OIDN_VERSION_NUMBER@
 #define OIDN_VERSION_STRING "@OIDN_VERSION_MAJOR@.@OIDN_VERSION_MINOR@.@OIDN_VERSION_PATCH@@OIDN_VERSION_NOTE@"
 
-// #define OIDN_API_NAMESPACE @OIDN_API_NAMESPACE @
+// #cmakedefine OIDN_API_NAMESPACE @OIDN_API_NAMESPACE@
+//#define OIDN_STATIC_LIB
 
 #if defined(OIDN_API_NAMESPACE)
-#define OIDN_API_NAMESPACE_BEGIN namespace @OIDN_API_NAMESPACE @{
-#define OIDN_API_NAMESPACE_END }
-#define OIDN_API_NAMESPACE_USING using namespace @OIDN_API_NAMESPACE @;
-#define OIDN_API_EXTERN_C
-#define OIDN_NAMESPACE @OIDN_API_NAMESPACE @ ::oidn
-#define OIDN_NAMESPACE_C @OIDN_API_NAMESPACE @_oidn
-#define OIDN_NAMESPACE_BEGIN namespace @OIDN_API_NAMESPACE @{namespace oidn {
-#define OIDN_NAMESPACE_END \
-  }                        \
-  }
+  #define OIDN_API_NAMESPACE_BEGIN namespace @OIDN_API_NAMESPACE@ {
+  #define OIDN_API_NAMESPACE_END }
+  #define OIDN_API_NAMESPACE_USING using namespace @OIDN_API_NAMESPACE@;
+  #define OIDN_API_EXTERN_C
+  #define OIDN_NAMESPACE @OIDN_API_NAMESPACE@::oidn
+  #define OIDN_NAMESPACE_C @OIDN_API_NAMESPACE@_oidn
+  #define OIDN_NAMESPACE_BEGIN namespace @OIDN_API_NAMESPACE@ { namespace oidn {
+  #define OIDN_NAMESPACE_END }}
 #else
-#define OIDN_API_NAMESPACE_BEGIN
-#define OIDN_API_NAMESPACE_END
-#define OIDN_API_NAMESPACE_USING
-#if defined(__cplusplus)
-#define OIDN_API_EXTERN_C extern "C"
-#else
-#define OIDN_API_EXTERN_C
-#endif
-#define OIDN_NAMESPACE oidn
-#define OIDN_NAMESPACE_C oidn
-#define OIDN_NAMESPACE_BEGIN \
-  namespace oidn             \
-  {
-#define OIDN_NAMESPACE_END }
+  #define OIDN_API_NAMESPACE_BEGIN
+  #define OIDN_API_NAMESPACE_END
+  #define OIDN_API_NAMESPACE_USING
+  #if defined(__cplusplus)
+    #define OIDN_API_EXTERN_C extern "C"
+  #else
+    #define OIDN_API_EXTERN_C
+  #endif
+  #define OIDN_NAMESPACE oidn
+  #define OIDN_NAMESPACE_C oidn
+  #define OIDN_NAMESPACE_BEGIN namespace oidn {
+  #define OIDN_NAMESPACE_END }
 #endif
 
 #define OIDN_NAMESPACE_USING using namespace OIDN_NAMESPACE;
 
-#if defined(_WIN32)
-#define OIDN_API_IMPORT OIDN_API_EXTERN_C __declspec(dllimport)
-#define OIDN_API_EXPORT OIDN_API_EXTERN_C __declspec(dllexport)
+#if defined(OIDN_STATIC_LIB)
+  #define OIDN_API_IMPORT OIDN_API_EXTERN_C
+  #define OIDN_API_EXPORT OIDN_API_EXTERN_C
+#elif defined(_WIN32)
+  #define OIDN_API_IMPORT OIDN_API_EXTERN_C __declspec(dllimport)
+  #define OIDN_API_EXPORT OIDN_API_EXTERN_C __declspec(dllexport)
 #else
-#define OIDN_API_IMPORT OIDN_API_EXTERN_C
-#define OIDN_API_EXPORT OIDN_API_EXTERN_C __attribute__((visibility("default")))
+  #define OIDN_API_IMPORT OIDN_API_EXTERN_C
+  #define OIDN_API_EXPORT OIDN_API_EXTERN_C __attribute__((visibility ("default")))
 #endif
 
 #if defined(OpenImageDenoise_EXPORTS)
-#define OIDN_API OIDN_API_EXPORT
+  #define OIDN_API OIDN_API_EXPORT
 #else
-#define OIDN_API OIDN_API_IMPORT
+  #define OIDN_API OIDN_API_IMPORT
 #endif
 
 #if defined(_WIN32)
-#define OIDN_DEPRECATED(msg) __declspec(deprecated(msg))
+  #define OIDN_DEPRECATED(msg) __declspec(deprecated(msg))
 #else
-#define OIDN_DEPRECATED(msg) __attribute__((deprecated(msg)))
+  #define OIDN_DEPRECATED(msg) __attribute__((deprecated(msg)))
 #endif
 
 #if !defined(OIDN_DEVICE_CPU)
-#define OIDN_DEVICE_CPU
+  #define OIDN_DEVICE_CPU
 #endif
 #if !defined(OIDN_DEVICE_SYCL)
-#define OIDN_DEVICE_SYCL
+  #define OIDN_DEVICE_SYCL
 #endif
 #if !defined(OIDN_DEVICE_CUDA)
-#define OIDN_DEVICE_CUDA
+  #define OIDN_DEVICE_CUDA
 #endif
 #if !defined(OIDN_DEVICE_HIP)
-#define OIDN_DEVICE_HIP
+  #define OIDN_DEVICE_HIP
 #endif
 
 #define OIDN_FILTER_RT

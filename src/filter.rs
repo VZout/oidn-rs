@@ -1,8 +1,4 @@
-use std::{
-    ffi::c_void,
-    mem::{size_of, transmute},
-    sync::Arc,
-};
+use std::{mem::size_of, sync::Arc};
 
 use crate::{device::Device, sys::*, FilterError};
 
@@ -17,10 +13,10 @@ pub struct RayTracing<'b> {
     albedo: Option<&'b [f32]>,
     normal: Option<&'b [f32]>,
 
-    color_dx12: Option<(usize, HANDLE)>,
-    albedo_dx12: Option<(usize, HANDLE)>,
-    normal_dx12: Option<(usize, HANDLE)>,
-    output_dx12: Option<(usize, HANDLE)>,
+    color_dx12: Option<(usize, usize, HANDLE)>,
+    albedo_dx12: Option<(usize, usize, HANDLE)>,
+    normal_dx12: Option<(usize, usize, HANDLE)>,
+    output_dx12: Option<(usize, usize, HANDLE)>,
 
     hdr: bool,
     input_scale: f32,
@@ -30,7 +26,7 @@ pub struct RayTracing<'b> {
 }
 
 pub unsafe extern "C" fn error(
-    userPtr: *mut ::std::os::raw::c_void,
+    _: *mut ::std::os::raw::c_void,
     code: OIDNError,
     message: *const ::std::os::raw::c_char,
 ) {
@@ -82,23 +78,43 @@ impl<'b> RayTracing<'b> {
         self
     }
 
-    pub fn color_dx12(&mut self, size: usize, ptr: HANDLE) -> &mut RayTracing<'b> {
-        self.color_dx12 = Some((size, ptr));
+    pub fn color_dx12(
+        &mut self,
+        size: usize,
+        bytes_per_row: usize,
+        ptr: HANDLE,
+    ) -> &mut RayTracing<'b> {
+        self.color_dx12 = Some((size, bytes_per_row, ptr));
         self
     }
 
-    pub fn albedo_dx12(&mut self, size: usize, ptr: HANDLE) -> &mut RayTracing<'b> {
-        self.albedo_dx12 = Some((size, ptr));
+    pub fn albedo_dx12(
+        &mut self,
+        size: usize,
+        bytes_per_row: usize,
+        ptr: HANDLE,
+    ) -> &mut RayTracing<'b> {
+        self.albedo_dx12 = Some((size, bytes_per_row, ptr));
         self
     }
 
-    pub fn normal_dx12(&mut self, size: usize, ptr: HANDLE) -> &mut RayTracing<'b> {
-        self.normal_dx12 = Some((size, ptr));
+    pub fn normal_dx12(
+        &mut self,
+        size: usize,
+        bytes_per_row: usize,
+        ptr: HANDLE,
+    ) -> &mut RayTracing<'b> {
+        self.normal_dx12 = Some((size, bytes_per_row, ptr));
         self
     }
 
-    pub fn output_dx12(&mut self, size: usize, ptr: HANDLE) -> &mut RayTracing<'b> {
-        self.output_dx12 = Some((size, ptr));
+    pub fn output_dx12(
+        &mut self,
+        size: usize,
+        bytes_per_row: usize,
+        ptr: HANDLE,
+    ) -> &mut RayTracing<'b> {
+        self.output_dx12 = Some((size, bytes_per_row, ptr));
         self
     }
 
@@ -151,23 +167,18 @@ impl<'b> RayTracing<'b> {
         self
     }
 
-    pub fn filter(&self, color: &[f32], output: &mut [f32]) -> Result<(), FilterError> {
-        self.execute_filter(Some(color), output)
-    }
-
-    pub fn filter_in_place(&self, color: &mut [f32]) -> Result<(), FilterError> {
-        self.execute_filter(None, color)
+    pub fn filter(&self) -> Result<(), FilterError> {
+        self.execute_filter()
     }
 
     pub fn setup(&self) -> Result<(), FilterError> {
         let pixelstride = size_of::<f32>() * 4;
-        let bytes_per_row = 0;
 
         let color_ptr = unsafe {
             oidnNewSharedBufferFromWin32Handle(
                 self.device.0,
-                OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32,
-                std::mem::transmute_copy(&self.color_dx12.unwrap().1),
+                OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_D3D12_RESOURCE,
+                std::mem::transmute_copy(&self.color_dx12.unwrap().2),
                 std::ptr::null() as _,
                 self.color_dx12.unwrap().0,
             )
@@ -178,11 +189,11 @@ impl<'b> RayTracing<'b> {
                 b"color\0" as *const _ as _,
                 color_ptr as *mut _,
                 OIDNFormat_OIDN_FORMAT_FLOAT3,
-                self.img_dims.0 as _,
-                self.img_dims.1 as _,
+                self.img_dims.0,
+                self.img_dims.1,
                 0,
                 pixelstride,
-                bytes_per_row,
+                self.color_dx12.unwrap().1,
             );
         }
 
@@ -190,8 +201,8 @@ impl<'b> RayTracing<'b> {
             let buffer = unsafe {
                 oidnNewSharedBufferFromWin32Handle(
                     self.device.0,
-                    OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32,
-                    std::mem::transmute_copy(&albedo.1),
+                    OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_D3D12_RESOURCE,
+                    std::mem::transmute_copy(&albedo.2),
                     std::ptr::null() as _,
                     albedo.0,
                 )
@@ -202,11 +213,11 @@ impl<'b> RayTracing<'b> {
                     b"albedo\0" as *const _ as _,
                     buffer as *mut _,
                     OIDNFormat_OIDN_FORMAT_FLOAT3,
-                    self.img_dims.0 as _,
-                    self.img_dims.1 as _,
+                    self.img_dims.0,
+                    self.img_dims.1,
                     0,
                     pixelstride,
-                    bytes_per_row,
+                    albedo.1,
                 );
             }
         }
@@ -215,8 +226,8 @@ impl<'b> RayTracing<'b> {
             let buffer = unsafe {
                 oidnNewSharedBufferFromWin32Handle(
                     self.device.0,
-                    OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32,
-                    std::mem::transmute_copy(&normal.1),
+                    OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_D3D12_RESOURCE,
+                    std::mem::transmute_copy(&normal.2),
                     std::ptr::null() as _,
                     normal.0,
                 )
@@ -227,11 +238,11 @@ impl<'b> RayTracing<'b> {
                     b"normal\0" as *const _ as _,
                     buffer as *mut _,
                     OIDNFormat_OIDN_FORMAT_FLOAT3,
-                    self.img_dims.0 as _,
-                    self.img_dims.1 as _,
+                    self.img_dims.0,
+                    self.img_dims.1,
                     0,
                     pixelstride,
-                    bytes_per_row,
+                    normal.1,
                 );
             }
         }
@@ -239,8 +250,8 @@ impl<'b> RayTracing<'b> {
         let output_buffer: *mut OIDNBufferImpl = unsafe {
             oidnNewSharedBufferFromWin32Handle(
                 self.device.0,
-                OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32,
-                std::mem::transmute(self.output_dx12.unwrap().1),
+                OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_D3D12_RESOURCE,
+                std::mem::transmute(self.output_dx12.unwrap().2),
                 std::ptr::null() as _,
                 self.output_dx12.unwrap().0,
             )
@@ -251,11 +262,11 @@ impl<'b> RayTracing<'b> {
                 b"output\0" as *const _ as _,
                 output_buffer as _,
                 OIDNFormat_OIDN_FORMAT_FLOAT3,
-                self.img_dims.0 as _,
-                self.img_dims.1 as _,
+                self.img_dims.0,
+                self.img_dims.1,
                 0,
                 pixelstride,
-                bytes_per_row,
+                self.output_dx12.unwrap().1,
             );
         }
 
@@ -286,79 +297,9 @@ impl<'b> RayTracing<'b> {
         }
     }
 
-    fn execute_filter(&self, color: Option<&[f32]>, output: &mut [f32]) -> Result<(), FilterError> {
-        let pixelstride = size_of::<f32>() * 4;
-        let bytes_per_row = 0;
-
-        let color_ptr = unsafe {
-            oidnNewSharedBufferFromWin32Handle(
-                self.device.0,
-                OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32,
-                std::mem::transmute_copy(&self.color_dx12.unwrap().1),
-                std::ptr::null() as _,
-                self.color_dx12.unwrap().0,
-            )
-        };
-
+    fn execute_filter(&self) -> Result<(), FilterError> {
         unsafe {
-            oidnSetFilterImage(
-                self.handle,
-                b"color\0" as *const _ as _,
-                color_ptr as *mut _,
-                OIDNFormat_OIDN_FORMAT_FLOAT3,
-                self.img_dims.0 as _,
-                self.img_dims.1 as _,
-                0,
-                pixelstride,
-                bytes_per_row,
-            );
-        }
-
-        let output_buffer: *mut OIDNBufferImpl = unsafe {
-            oidnNewSharedBufferFromWin32Handle(
-                self.device.0,
-                OIDNExternalMemoryTypeFlag_OIDN_EXTERNAL_MEMORY_TYPE_FLAG_OPAQUE_WIN32,
-                std::mem::transmute(self.output_dx12.unwrap().1),
-                std::ptr::null() as _,
-                self.output_dx12.unwrap().0,
-            )
-        };
-
-        unsafe {
-            oidnSetFilterImage(
-                self.handle,
-                b"output\0" as *const _ as _,
-                output_buffer as _,
-                OIDNFormat_OIDN_FORMAT_FLOAT3,
-                self.img_dims.0 as _,
-                self.img_dims.1 as _,
-                0,
-                pixelstride,
-                bytes_per_row,
-            );
-        }
-
-        unsafe {
-            oidnSetFilterBool(self.handle, b"hdr\0" as *const _ as _, self.hdr);
-            oidnSetFilterFloat(
-                self.handle,
-                b"inputScale\0" as *const _ as _,
-                self.input_scale,
-            );
-            oidnSetFilterBool(self.handle, b"srgb\0" as *const _ as _, self.srgb);
-            oidnSetFilterInt(
-                self.handle,
-                b"quality\0" as *const _ as _,
-                OIDNQuality_OIDN_QUALITY_HIGH,
-            );
-            oidnSetFilterBool(self.handle, b"clean_aux\0" as *const _ as _, self.clean_aux);
-
-            oidnCommitFilter(self.handle);
-            //let buffer = vec![0u8; 1000];
-            //let error = oidnGetDeviceError(self.device.0, &mut buffer.as_ptr() as *mut _ as *mut _);
             oidnExecuteFilter(self.handle);
-
-            //println!("blah {:?}", error);
         }
 
         Ok(())
