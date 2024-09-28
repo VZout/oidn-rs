@@ -256,6 +256,16 @@ OIDN_NAMESPACE_BEGIN
       return handle != nullptr;
     }
 
+    // Releases the buffer (decrements the reference count).
+    void release()
+    {
+      if (handle)
+      {
+        oidnReleaseBuffer(handle);
+        handle = nullptr;
+      }
+    }
+
     // Gets the size of the buffer in bytes.
     size_t getSize() const
     {
@@ -277,13 +287,13 @@ OIDN_NAMESPACE_BEGIN
     }
 
     // Copies data from a region of the buffer to host memory.
-    void read(size_t byteOffset, size_t byteSize, void* dstHostPtr)
+    void read(size_t byteOffset, size_t byteSize, void* dstHostPtr) const
     {
       oidnReadBuffer(handle, byteOffset, byteSize, dstHostPtr);
     }
 
     // Copies data from a region of the buffer to host memory asynchronously.
-    void readAsync(size_t byteOffset, size_t byteSize, void* dstHostPtr)
+    void readAsync(size_t byteOffset, size_t byteSize, void* dstHostPtr) const
     {
       oidnReadBufferAsync(handle, byteOffset, byteSize, dstHostPtr);
     }
@@ -313,6 +323,7 @@ OIDN_NAMESPACE_BEGIN
   {
     Default  = OIDN_QUALITY_DEFAULT,  // default quality
 
+    Fast     = OIDN_QUALITY_FAST,     // high performance (for interactive/real-time preview rendering)
     Balanced = OIDN_QUALITY_BALANCED, // balanced quality/performance (for interactive/real-time rendering)
     High     = OIDN_QUALITY_HIGH,     // high quality (for final-frame rendering)
   };
@@ -381,6 +392,16 @@ OIDN_NAMESPACE_BEGIN
     operator bool() const
     {
       return handle != nullptr;
+    }
+
+    // Releases the filter (decrements the reference count).
+    void release()
+    {
+      if (handle)
+      {
+        oidnReleaseFilter(handle);
+        handle = nullptr;
+      }
     }
 
     // Sets an image parameter of the filter with data stored in a buffer.
@@ -498,7 +519,7 @@ OIDN_NAMESPACE_BEGIN
       oidnExecuteFilterAsync(handle);
     }
 
-  #if defined(SYCL_LANGUAGE_VERSION)
+  #if defined(OIDN_SYCL_HPP)
     // Executes the filter of a SYCL device using the specified dependent events asynchronously, and
     // optionally returns an event for completion.
     sycl::event executeAsync(const std::vector<sycl::event>& depEvents)
@@ -546,10 +567,11 @@ OIDN_NAMESPACE_BEGIN
   {
     Default = OIDN_DEVICE_TYPE_DEFAULT, // select device automatically
 
-    CPU  = OIDN_DEVICE_TYPE_CPU,  // CPU device
-    SYCL = OIDN_DEVICE_TYPE_SYCL, // SYCL device
-    CUDA = OIDN_DEVICE_TYPE_CUDA, // CUDA device
-    HIP  = OIDN_DEVICE_TYPE_HIP,  // HIP device
+    CPU   = OIDN_DEVICE_TYPE_CPU,   // CPU device
+    SYCL  = OIDN_DEVICE_TYPE_SYCL,  // SYCL device
+    CUDA  = OIDN_DEVICE_TYPE_CUDA,  // CUDA device
+    HIP   = OIDN_DEVICE_TYPE_HIP,   // HIP device
+    Metal = OIDN_DEVICE_TYPE_METAL, // Metal device
   };
 
   // Error codes
@@ -650,6 +672,16 @@ OIDN_NAMESPACE_BEGIN
       return handle != nullptr;
     }
 
+    // Releases the device (decrements the reference count).
+    void release()
+    {
+      if (handle)
+      {
+        oidnReleaseDevice(handle);
+        handle = nullptr;
+      }
+    }
+
     // Sets a boolean parameter of the device.
     void set(const char* name, bool value)
     {
@@ -739,6 +771,15 @@ OIDN_NAMESPACE_BEGIN
         this->handle, static_cast<OIDNExternalMemoryTypeFlag>(handleType), handle, name, byteSize);
     }
 
+    // Creates a shared buffer from a Metal buffer.
+    // Only buffers with shared or private storage and hazard tracking are supported.
+  #if defined(__OBJC__)
+    BufferRef newBuffer(id<MTLBuffer> buffer) const
+    {
+      return oidnNewSharedBufferFromMetal(handle, buffer);
+    }
+  #endif
+
     // Creates a filter of the specified type (e.g. "RT").
     FilterRef newFilter(const char* type) const
     {
@@ -792,6 +833,38 @@ OIDN_NAMESPACE_BEGIN
     return static_cast<Error>(oidnGetDeviceError(nullptr, &outMessage));
   }
 
+  // Returns whether the CPU device is supported.
+  inline bool isCPUDeviceSupported()
+  {
+    return oidnIsCPUDeviceSupported();
+  }
+
+  // Returns whether the specified SYCL device is supported.
+#if defined(OIDN_SYCL_HPP)
+  inline bool isSYCLDeviceSupported(const sycl::device& device)
+  {
+    return oidnIsSYCLDeviceSupported(&device);
+  }
+#endif
+
+  // Returns whether the specified CUDA device is supported.
+  inline bool isCUDADeviceSupported(int deviceID)
+  {
+    return oidnIsCUDADeviceSupported(deviceID);
+  }
+
+  // Returns whether the specified HIP device is supported.
+  inline bool isHIPDeviceSupported(int deviceID)
+  {
+    return oidnIsHIPDeviceSupported(deviceID);
+  }
+
+  // Returns whether the specified Metal device is supported.
+  inline bool isMetalDeviceSupported(MTLDevice_id device)
+  {
+    return oidnIsMetalDeviceSupported(device);
+  }
+
   // Creates a device of the specified type.
   inline DeviceRef newDevice(DeviceType type = DeviceType::Default)
   {
@@ -822,7 +895,7 @@ OIDN_NAMESPACE_BEGIN
     return DeviceRef(oidnNewDeviceByPCIAddress(pciDomain, pciBus, pciDevice, pciFunction));
   }
 
-#if defined(SYCL_LANGUAGE_VERSION)
+#if defined(OIDN_SYCL_HPP)
   // Creates a device from the specified SYCL queue.
   inline DeviceRef newSYCLDevice(const sycl::queue& queue)
   {
@@ -838,16 +911,15 @@ OIDN_NAMESPACE_BEGIN
   }
 #endif
 
-  // Creates a device from the specified CUDA device ID (negative value maps to the current device)
-  // and stream.
+  // Creates a device from the specified CUDA device ID and stream (null stream corresponds to the
+  // default stream).
   inline DeviceRef newCUDADevice(int deviceID, cudaStream_t stream)
   {
     return DeviceRef(oidnNewCUDADevice(&deviceID, &stream, 1));
   }
 
-  // Creates a device from the specified pairs of CUDA device IDs (negative ID corresponds to the
-  // current device) and streams (null stream corresponds to the default stream).
-  // Currently only one device ID/stream is supported.
+  // Creates a device from the specified pairs of CUDA device IDs and streams (null stream
+  // corresponds to the default stream). Currently only one device ID/stream is supported.
   inline DeviceRef newCUDADevice(const std::vector<int>& deviceIDs,
                                  const std::vector<cudaStream_t>& streams)
   {
@@ -856,22 +928,34 @@ OIDN_NAMESPACE_BEGIN
                                        static_cast<int>(streams.size())));
   }
 
-  // Creates a device from the specified HIP device ID (negative ID corresponds to the current
-  // device) and stream (null stream corresponds to the default stream).
+  // Creates a device from the specified HIP device ID and stream (null stream corresponds to the
+  // default stream).
   inline DeviceRef newHIPDevice(int deviceID, hipStream_t stream)
   {
     return DeviceRef(oidnNewHIPDevice(&deviceID, &stream, 1));
   }
 
-  // Creates a device from the specified pairs of HIP device IDs (negative ID corresponds to the
-  // current device) and streams (null stream corresponds to the default stream).
-  // Currently only one device ID/stream is supported.
+  // Creates a device from the specified pairs of HIP device IDs and streams (null stream
+  // corresponds to the default stream). Currently only one device ID/stream is supported.
   inline DeviceRef newHIPDevice(const std::vector<int>& deviceIDs,
                                 const std::vector<hipStream_t>& streams)
   {
     assert(deviceIDs.size() == streams.size());
     return DeviceRef(oidnNewHIPDevice(deviceIDs.data(), streams.data(),
                                       static_cast<int>(streams.size())));
+  }
+
+  // Creates a device from the specified Metal command queue.
+  inline DeviceRef newMetalDevice(MTLCommandQueue_id commandQueue)
+  {
+    return DeviceRef(oidnNewMetalDevice(&commandQueue, 1));
+  }
+
+  // Creates a device from the specified list of Metal command queues.
+  // Currently only one queue is supported.
+  inline DeviceRef newMetalDevice(const std::vector<MTLCommandQueue_id>& commandQueues)
+  {
+    return DeviceRef(oidnNewMetalDevice(commandQueues.data(), static_cast<int>(commandQueues.size())));
   }
 
   // -----------------------------------------------------------------------------------------------

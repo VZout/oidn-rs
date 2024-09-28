@@ -47,7 +47,8 @@ impl Device {
             Ok(())
         } else {
             let msg = unsafe { CStr::from_ptr(err_msg).to_string_lossy().to_string() };
-            Err((err.try_into().unwrap(), msg))
+            panic!("{msg}");
+            //Err((err.try_into().unwrap(), msg))
         }
     }
 }

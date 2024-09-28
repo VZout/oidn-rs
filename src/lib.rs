@@ -31,8 +31,6 @@
 //! // Save out or display filter_output image.
 //! ```
 
-use num_enum::TryFromPrimitive;
-
 pub mod device;
 pub mod filter;
 #[allow(non_upper_case_globals, non_camel_case_types, non_snake_case)]
@@ -45,7 +43,7 @@ pub use filter::RayTracing;
 
 // TODO: Rename later to just Error in a 2.0 release
 #[repr(i32)]
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, TryFromPrimitive)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum FilterError {
     None = sys::OIDNError_OIDN_ERROR_NONE,
     Unknown = sys::OIDNError_OIDN_ERROR_UNKNOWN,

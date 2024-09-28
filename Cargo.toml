@@ -21,9 +21,6 @@ exclude = [
 ]
 links = "OpenImageDenoise"
 
-[dependencies]
-num_enum = "0.5.7"
-
 [workspace]
 resolver = "2"
 members = [

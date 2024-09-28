@@ -173,6 +173,7 @@ impl<'b> RayTracing<'b> {
 
     pub fn setup(&self) -> Result<(), FilterError> {
         let pixelstride = size_of::<f32>() * 4;
+        let pixelstride_half = size_of::<f32>() / 2 * 4;
 
         let color_ptr = unsafe {
             oidnNewSharedBufferFromWin32Handle(
@@ -212,11 +213,11 @@ impl<'b> RayTracing<'b> {
                     self.handle,
                     b"albedo\0" as *const _ as _,
                     buffer as *mut _,
-                    OIDNFormat_OIDN_FORMAT_FLOAT3,
+                    OIDNFormat_OIDN_FORMAT_HALF3,
                     self.img_dims.0,
                     self.img_dims.1,
                     0,
-                    pixelstride,
+                    pixelstride_half,
                     albedo.1,
                 );
             }
@@ -237,11 +238,11 @@ impl<'b> RayTracing<'b> {
                     self.handle,
                     b"normal\0" as *const _ as _,
                     buffer as *mut _,
-                    OIDNFormat_OIDN_FORMAT_FLOAT3,
+                    OIDNFormat_OIDN_FORMAT_HALF3,
                     self.img_dims.0,
                     self.img_dims.1,
                     0,
-                    pixelstride,
+                    pixelstride_half,
                     normal.1,
                 );
             }
@@ -261,11 +262,11 @@ impl<'b> RayTracing<'b> {
                 self.handle,
                 b"output\0" as *const _ as _,
                 output_buffer as _,
-                OIDNFormat_OIDN_FORMAT_FLOAT3,
+                OIDNFormat_OIDN_FORMAT_HALF3,
                 self.img_dims.0,
                 self.img_dims.1,
                 0,
-                pixelstride,
+                pixelstride_half,
                 self.output_dx12.unwrap().1,
             );
         }
@@ -281,7 +282,7 @@ impl<'b> RayTracing<'b> {
             oidnSetFilterInt(
                 self.handle,
                 b"quality\0" as *const _ as _,
-                OIDNQuality_OIDN_QUALITY_BALANCED,
+                OIDNQuality_OIDN_QUALITY_FAST,
             );
             oidnSetFilterBool(self.handle, b"clean_aux\0" as *const _ as _, self.clean_aux);
 
